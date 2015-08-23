@@ -131,7 +131,7 @@ C5.0predictions_test <- predict(C5.0Fit1, newdata = testing_clear)
 confusionMatrix(C5.0predictions_test, testing_clear$classe)
 ```
 
-As it is visible the method "C5.0" performs significantly better. This method is therefore chosen for the final prediction:
+As it is visible the method "C5.0" performs significantly better. The accuracy of this model is over 99%, from which we expect an out of sample error less than 1%. This method is therefore chosen for the final prediction:
 
 ###Final Prediction
 For the final prediction the data, has to be read from the file. It was afterwards necessary to change the data type to match the types of the training data. 
