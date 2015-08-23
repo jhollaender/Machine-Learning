@@ -1,0 +1,12 @@
+base
+lattice
+ggplot2
+caret
+e1071
+survival
+gbm
+rpart
+mlbench
+adabag
+C50
+plyr

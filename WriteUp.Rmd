@@ -1,0 +1,147 @@
+---
+title: "Practical Machine Learning"
+author: "Jonas Holländer"
+date: "Wednesday, August 19, 2015"
+output: html_document
+---
+
+##Overview
+
+This document shows the design of a machine learning algorithm and is handed in as a write up for the coursera course practical machine learning that can be found [here](https://class.coursera.org/predmachlearn-031/human_grading/view/courses/975200/assessments/4/submissions).
+
+The aim of the algorithm is to predict the manor in which execises are done, in dependence of a given set of features. 
+
+##Algorithm
+
+###Set up
+The algoithm starts with loading several libraries, a function "convert.magic" that converts the data type of a data frame.
+
+```{r set up, cache=TRUE,comment=FALSE, warning=FALSE,message=FALSE}
+library(caret)
+library(e1071)
+library(gbm)
+library(adabag)
+library(C50)
+
+
+convert.magic <- function(x, y=NA) {
+  for(i in 1:length(y)) { 
+    if (y[i] == "integer") { 
+      x[i] <- as.integer(x[[i]])
+    }
+    if (y[i] == "factor")
+      x[i] <- as.factor(x[[i]])
+    if (y[i] == "numeric")
+      x[i] <- as.numeric(x[[i]])
+  }
+  return(x)
+}
+```
+
+In the next step the data used in the training of the algorithm is read from a file. Then the data type of the target variable is converted to factorial and a test and trainings set is created.
+
+```{r set up 2, cache=TRUE,comment=FALSE, warning=FALSE,message=FALSE}
+data=read.csv(file="pml-training.csv")
+
+data$classe<-as.factor(data$classe)
+
+
+set.seed(1234)
+inTraining <- createDataPartition(data$classe, p = .6, list = FALSE)
+training <- data[ inTraining,]
+testing  <- data[-inTraining,]
+
+```
+
+###Cleaning the data
+The data are cleaned through three steps. In each step the indices of the predictors, which will be colleted in the variabe "remove".The tree steps are:
+
+  1. Removing variales with nearly zero variance. 
+  
+  2. Removing the first variable as they descibe external factors, i.e. the time when the measurement was done.
+  
+  3. Removing data with more than 90% NA values.
+  
+After this we create the data frames "training_clear" and "testing_clear", which contain the cleaned data.
+  
+
+
+```{r cleaning, cache=TRUE,comment=FALSE, warning=FALSE,message=FALSE}
+clear_nzv=nearZeroVar(training, saveMetrics=TRUE)
+
+remove=clear_nzv$nzv
+remove[1:7]=TRUE
+
+for(i in 1:length(remove)){
+  if(sum(is.na(training[,i]))/length(training[,i])>0.9){
+    remove[i]=TRUE
+  }
+}
+
+
+
+training_clear=training[,!remove]
+testing_clear=testing[,!remove]
+```
+
+###Training the Algorithm
+
+The training algorithm works as follows. First The fit control is specified. In my case this is done through a 3 fold cross validation. 
+
+
+```{r training cv , cache=TRUE,comment=FALSE, warning=FALSE,message=FALSE}
+fitControl <- trainControl(## 3-fold CV
+  method = "repeatedcv",
+  number = 3,
+  ## repeated ten times
+  repeats = 3)
+```
+After this the trained model has to be specified. In my case I use a classification where the class variable should be determined in dependence on all other variables. This is denoted through: *classe ~ .**
+
+I trained 2 different models, to compare there output later. The method tester here are called
+"gbm" and "C5.0"
+
+```{r training model , cache=TRUE,comment=FALSE, warning=FALSE,message=FALSE}
+gbmFit1 <- train(classe ~ ., data = training_clear,
+                 method = "gbm",
+                 trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE)
+
+
+C5.0Fit1 <- train(classe ~ ., data = training_clear,
+                 method = "C5.0",
+                 trControl = fitControl,
+                 ## This last option is actually one
+                 ## for gbm() that passes through
+                 verbose = FALSE)
+
+```
+
+
+###Testing the Algorithm
+
+After the training of the model, the testing is done. This is done via the confusion matrices:
+
+```{r testing model, cache=TRUE,comment=TRUE, warning=FALSE}
+gbm_predictions_test <- predict(gbmFit1, newdata = testing_clear)
+confusionMatrix(gbm_predictions_test, testing_clear$classe)
+C5.0predictions_test <- predict(C5.0Fit1, newdata = testing_clear)
+confusionMatrix(C5.0predictions_test, testing_clear$classe)
+```
+
+As it is visible the method "C5.0" performs significantly better. This method is therefore chosen for the final prediction:
+
+###Final Prediction
+For the final prediction the data, has to be read from the file. It was afterwards necessary to change the data type to match the types of the training data. 
+After wards the prediction was done:
+
+```{r final prediction , cache=TRUE,comment=TRUE, warning=FALSE}
+data_real_test=read.csv(file="pml-testing_1.csv")
+data_real_test=convert.magic(data_real_test[,!remove], classes)
+predict(C5.0Fit1, newdata = data_real_test)
+```
+
+
+
